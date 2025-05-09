@@ -2,10 +2,10 @@
     "version": 2,
     "builds": [
         {
-            "src": "utilitycoverapi/*.py",
+            "src": "fastapidebit.py",
             "use": "@vercel/python",
-            "config" : {
-                "maxLambdaSize": "50mb",
+            "config": {
+                "maxLambdaSize": "15mb",
                 "runtime": "python3.11"
             }
         }
@@ -13,7 +13,7 @@
     "routes": [
         {
             "src": "/(.*)",
-            "dest": "utilitycoverapi/fastapidebit.py"
+            "dest": "fastapidebit.py"
         }
     ]
 }
