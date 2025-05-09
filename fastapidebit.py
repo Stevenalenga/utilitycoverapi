@@ -6,6 +6,7 @@ from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 import os
+import tempfile
 
 app = FastAPI()
 
@@ -52,7 +53,7 @@ class DebitNoteData(BaseModel):
 @app.post("/generate-debit-note")
 async def generate_debit_note(data: DebitNoteData):
     filename = f"DebitNote_{data.vehicle_covered.replace(' ', '')}_{datetime.now().strftime('%d-%m-%Y')}.pdf"
-    filepath = f"./{filename}"
+    filepath = os.path.join(tempfile.gettempdir(), filename)
 
     c = canvas.Canvas(filepath, pagesize=A4)
     width, height = A4
