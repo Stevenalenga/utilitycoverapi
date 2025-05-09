@@ -38,6 +38,17 @@ class DebitNoteData(BaseModel):
     period_of_insurance: str
     terms_of_payment: str
 
+
+    @app.get("/")
+    async def home():
+        return {
+            "message": "Welcome to the Utility Cover API!",
+            "description": "This API allows you to generate motor debit/risk notes in PDF format.",
+            "endpoints": {
+                "/generate-debit-note": "POST - Generate a debit note by providing the required data."
+            }
+        }
+
 @app.post("/generate-debit-note")
 async def generate_debit_note(data: DebitNoteData):
     filename = f"DebitNote_{data.vehicle_covered.replace(' ', '')}_{datetime.now().strftime('%d-%m-%Y')}.pdf"
