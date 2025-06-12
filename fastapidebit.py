@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from typing import Optional
 import os
 import tempfile
 
@@ -12,20 +13,21 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"],  
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 class DebitNoteData(BaseModel):
-    sum_insured: float
-    basic_premium_rate: float
-    excess_protector: int
+    insurance_type: str
+    sum_insured: float = 0.0
+    basic_premium_rate: float = 0.0
+    excess_protector: int = 0
     radio_cassette: str
     windscreen_cover: str
-    tl: int
-    sd: int
+    tl: int = 0
+    sd: int = 0
     class_of_insurance: str
     policy_number: str
     name_of_insured: str
@@ -38,17 +40,19 @@ class DebitNoteData(BaseModel):
     color: str
     period_of_insurance: str
     terms_of_payment: str
+    generated_by: Optional[str] = None
 
 
-    @app.get("/")
-    async def home():
-        return {
-            "message": "Welcome to the Utility Cover API!",
-            "description": "This API allows you to generate motor debit/risk notes in PDF format.",
-            "endpoints": {
-                "/generate-debit-note": "POST - Generate a debit note by providing the required data."
-            }
+@app.get("/")
+async def home():
+    return {
+        "message": "Welcome to the Utility Cover API!",
+        "description": "This API allows you to generate motor debit/risk notes in PDF format.",
+        "endpoints": {
+            "/generate-debit-note": "POST - Generate a debit note by providing the required data."
         }
+    }
+
 
 @app.post("/generate-debit-note")
 async def generate_debit_note(data: DebitNoteData):
@@ -67,40 +71,52 @@ async def generate_debit_note(data: DebitNoteData):
     c.drawCentredString(width / 2, height - 90, "TEL: 020 310040/1 CELL: 0722 766 583 / 0733-766 583")
     c.drawCentredString(width / 2, height - 105, "Email: utilitycoverinsuranceagencies@gmail.com")
 
-    # Main content
+    # Title
     y = height - 140
     c.setFont("Helvetica-Bold", 12)
     c.drawString(50, y, "MOTOR DEBIT / RISK NOTE")
-
-    y -= 30
-    c.setFont("Helvetica", 10)
-    calculated_basic_premium = (data.sum_insured * data.basic_premium_rate) / 100
-    
-    c.drawString(50, y, f"SUM INSURED:        Kshs. {data.sum_insured:,}")
-    y -= 20
-    c.drawString(50, y, f"BASIC PREMIUM RATE: {data.basic_premium_rate}%")
-    y -= 20
-    c.drawString(50, y, f"BASIC PREMIUM:      Kshs. {calculated_basic_premium:,}")
-    y -= 20
-    c.drawString(50, y, f"Excess Protector:   Kshs. {data.excess_protector:,}")
-    y -= 20
-    c.drawString(50, y, f"Radio Cassette:     {data.radio_cassette} (Free)")
-    y -= 20
-    c.drawString(50, y, f"Windscreen Cover:   {data.windscreen_cover} (Free)")
-    y -= 20
-    c.drawString(50, y, f"+TL:                Kshs. {data.tl:,}")
-    y -= 20
-    c.drawString(50, y, f"+SD:                Kshs. {data.sd:,}")
-
-    total_premium = calculated_basic_premium + data.excess_protector + data.tl + data.sd
-
-    y -= 30
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(50, y, f"Total premium:      Kshs. {total_premium:,}")
-
-    # Additional Details
     y -= 40
+
+    # Insurance Type
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(50, y, "INSURANCE TYPE:")
     c.setFont("Helvetica", 10)
+    c.drawString(200, y, data.insurance_type.upper())
+    y -= 25
+
+    # Premium Calculation
+    sum_insured = data.sum_insured or 0
+    basic_premium_rate = data.basic_premium_rate or 0
+    excess_protector = data.excess_protector or 0
+    tl = data.tl or 0
+    sd = data.sd or 0
+
+    calculated_basic_premium = sum_insured if basic_premium_rate == 0 else (sum_insured * basic_premium_rate) / 100
+    total_premium = calculated_basic_premium + excess_protector + tl + sd
+
+    c.drawString(50, y, f"SUM INSURED:        Kshs. {sum_insured:,}")
+    y -= 25
+    c.drawString(50, y, f"BASIC PREMIUM RATE: {basic_premium_rate}%")
+    y -= 25
+    c.drawString(50, y, f"BASIC PREMIUM:      Kshs. {calculated_basic_premium:,.2f}")
+    y -= 25
+    c.drawString(50, y, f"Excess Protector:   Kshs. {excess_protector:,}")
+    y -= 25
+    c.drawString(50, y, f"Radio Cassette:     {data.radio_cassette.upper()} (FREE)")
+    y -= 25
+    c.drawString(50, y, f"Windscreen Cover:   {data.windscreen_cover.upper()} (FREE)")
+    y -= 25
+    c.drawString(50, y, f"+TL:                Kshs. {tl:,}")
+    y -= 25
+    c.drawString(50, y, f"+SD:                Kshs. {sd:,}")
+    y -= 40
+
+    # Total Premium
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(50, y, f"TOTAL PREMIUM:      Kshs. {total_premium:,.2f}")
+    y -= 50
+
+    # Policy Fields
     fields = [
         ("CLASS OF INSURANCE", data.class_of_insurance),
         ("POLICY NUMBER", data.policy_number),
@@ -114,21 +130,32 @@ async def generate_debit_note(data: DebitNoteData):
         ("COLOR", data.color),
         ("PERIOD OF INSURANCE", data.period_of_insurance),
     ]
-    
+
+    if data.generated_by:
+        fields.append(("GENERATED BY", data.generated_by))
+
     for label, value in fields:
-        c.drawString(50, y, f"{label}: {value}")
-        y -= 20
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(50, y, f"{label}:")
+        c.setFont("Helvetica", 10)
+        c.drawString(200, y, f"{value.upper() if isinstance(value, str) else value}")
+        y -= 25
 
-    y -= 20
+    # Reduced spacing after "GENERATED BY"
+    y -= 15
+
+    # Terms of Payment
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(50, y, "Terms of Payment:")
-    c.setFont("Helvetica", 10)
+    c.drawString(50, y, "TERMS OF PAYMENT:")
     y -= 20
-    c.drawString(70, y, f"{data.terms_of_payment}")
+    c.setFont("Helvetica", 10)
+    c.drawString(70, y, data.terms_of_payment.upper())
+    y -= 25  # reduced from 50
 
-    y -= 40
-    c.drawString(50, y, f"Date Issued: {datetime.now().strftime('%d/%m/%Y')}")
+    # Date Issued
+    c.drawString(50, y, f"DATE ISSUED: {datetime.now().strftime('%d/%m/%Y')}")
 
+    # Finalize PDF
     c.showPage()
     c.save()
 
